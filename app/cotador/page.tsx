@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import {
   Search, Link as LinkIcon, RefreshCw,
-  TrendingUp, ArrowRight, AlertCircle, Box, X, 
+  AlertCircle, Box, X, 
   Filter, CheckSquare, Square, Calculator, Copy, Camera, Download
 } from 'lucide-react';
 
@@ -12,18 +12,17 @@ interface SkinCotada {
   id: string;
   name: string;
   cleanName: string;
-  market_hash_name: string;
   image: string | null;
   amount: number;
   buffBRL: string;
   youpinBRL: string;
-  isStatTrak?: boolean;
-  isSouvenir?: boolean;
-  wear?: string;
-  float?: number | null;
-  pattern?: number | null;
-  phase?: string | null;
-  fade?: number | null;
+  isStatTrak: boolean;
+  isSouvenir: boolean;
+  wear: string | null;
+  float: number | null;
+  pattern: number | null;
+  phase: string | null;
+  fade: number | null;
 }
 
 interface ItemAvulso {
@@ -37,9 +36,13 @@ interface ItemAvulso {
   youpinOriginalCNY: number;
   youpinCNYComTaxa: number;
   cnyBrl: number;
-  wear?: string | null;
-  isStatTrak?: boolean;
-  isSouvenir?: boolean;
+  wear: string | null;
+  isStatTrak: boolean;
+  isSouvenir: boolean;
+  float: number | null;
+  pattern: number | null;
+  phase: string | null;
+  fade: number | null;
 }
 
 interface Sugestao {
@@ -57,7 +60,6 @@ export default function CotadorPage() {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [itensSelecionados, setItensSelecionados] = useState<Set<string>>(new Set());
   const [filtroTipo, setFiltroTipo] = useState('todos');
-  const [ordemPreco, setOrdemPreco] = useState('desc');
   const [descontoOferta, setDescontoOferta] = useState("15");
   const [modalImagemAberto, setModalImagemAberto] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -85,6 +87,21 @@ export default function CotadorPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // 🔥 Log de Debug Frontend exato conforme solicitado
+  useEffect(() => {
+    if (resultadoInventario) {
+      const comAtributos = resultadoInventario.items.filter(i => i.float !== null || i.pattern !== null || i.phase !== null);
+      if (comAtributos.length > 0) {
+        console.log(`\n==================================================`);
+        console.log(`[FRONTEND]`);
+        console.log(`Dados recebidos para ${comAtributos.length} itens.`);
+        console.log(`Exemplo - ${comAtributos[0].cleanName}:`);
+        console.log(`float: ${comAtributos[0].float}`);
+        console.log(`==================================================\n`);
+      }
+    }
+  }, [resultadoInventario]);
 
   const handleCotarInventario = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,10 +131,10 @@ export default function CotadorPage() {
 
   const itensFiltrados = useMemo(() => {
     if (!resultadoInventario) return [];
-    const filtrados = filtroTipo === 'todos' 
+    return filtroTipo === 'todos' 
       ? [...resultadoInventario.items]
       : resultadoInventario.items.filter(item => {
-          const nome = (item.name || item.market_hash_name).toLowerCase();
+          const nome = item.name.toLowerCase();
           const isGraffiti = nome.includes('graffiti');
           if (filtroTipo === 'faca') return !isGraffiti && (nome.includes('knife') || nome.includes('karambit') || nome.includes('bayonet') || nome.includes('butterfly') || nome.includes('daggers') || nome.includes('talon') || nome.includes('navaja') || nome.includes('stiletto') || nome.includes('ursus') || nome.includes('bowie') || nome.includes('falchion') || nome.includes('huntsman') || nome.includes('gut'));
           if (filtroTipo === 'luva') return !isGraffiti && (nome.includes('gloves') || nome.includes('hand wraps') || nome.includes('bloodhound'));
@@ -126,13 +143,7 @@ export default function CotadorPage() {
           if (filtroTipo === 'arma') return !isGraffiti && !nome.includes('knife') && !nome.includes('gloves') && !nome.includes('hand wraps') && !nome.includes('case') && !nome.includes('capsule') && !nome.includes('package') && !nome.includes('sticker') && !nome.includes('patch') && !nome.includes('pin') && !nome.includes('music kit');
           return true;
         });
-
-    return filtrados.sort((a, b) => {
-      const precoA = parseFloat(a.buffBRL) || 0;
-      const precoB = parseFloat(b.buffBRL) || 0;
-      return ordemPreco === 'desc' ? precoB - precoA : precoA - precoB;
-    });
-  }, [resultadoInventario, filtroTipo, ordemPreco]);
+  }, [resultadoInventario, filtroTipo]);
 
   const totalBuff = useMemo(() => {
     if (!resultadoInventario) return 0;
@@ -147,7 +158,8 @@ export default function CotadorPage() {
   }, [resultadoInventario, modoSelecao, itensSelecionados]);
 
   const totalMedio = (totalBuff + totalYoupin) / 2;
-  const valorOferta = totalYoupin * (1 - (parseFloat(descontoOferta) || 0) / 100);
+  const descontoNum = parseFloat(descontoOferta) || 0;
+  const valorOferta = totalYoupin * (1 - descontoNum / 100);
   const lucroRealizado = totalYoupin - valorOferta;
 
   const itensParaModal = useMemo(() => {
@@ -155,12 +167,11 @@ export default function CotadorPage() {
     return resultadoInventario.items.filter(i => itensSelecionados.has(i.id));
   }, [resultadoInventario, itensSelecionados]);
 
-  // 🔥 EXPORTAÇÃO CORRIGIDA - Cache Busting e CORS Strict
   const exportarImagem = async () => {
     if (!modalRef.current) return;
     try {
       const canvas = await html2canvas(modalRef.current, { 
-        backgroundColor: '#050505', 
+        backgroundColor: null,
         scale: 2,
         logging: false,
         useCORS: true, 
@@ -235,7 +246,7 @@ export default function CotadorPage() {
             newItems[index].amount = (newItems[index].amount || 1) + 1;
             return newItems;
         }
-        return [{ ...data, cleanName, wear, image: data.image || imageStr || null, amount: 1, id: addedId, isStatTrak: data.name.includes('StatTrak™'), isSouvenir: data.name.includes('Souvenir') }, ...prev];
+        return [{ ...data, cleanName, wear, image: data.image || imageStr || null, amount: 1, id: addedId, isStatTrak: data.name.includes('StatTrak™'), isSouvenir: data.name.includes('Souvenir'), float: null, pattern: null, phase: null, fade: null }, ...prev];
       });
     } catch (error: unknown) {
       setErro(error instanceof Error ? error.message : 'Skin não encontrada');
@@ -328,29 +339,29 @@ export default function CotadorPage() {
 
   return (
     <main className="min-h-screen bg-[#050505] pb-20 text-white">
-      <header className="border-b border-white/[0.03] bg-[#080809]/50 backdrop-blur-md px-8 py-20">
-        <div className="max-w-[1440px] mx-auto text-center md:text-left flex flex-col md:flex-row justify-between items-end gap-8">
+      <header className="border-b border-white/5 bg-[#080809]/50 backdrop-blur-md px-8 py-20">
+        <div className="max-w-360 mx-auto text-center md:text-left flex flex-col md:flex-row justify-between items-end gap-8">
           <div className="max-w-2xl">
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">Cotador Profissional</h1>
             <p className="text-zinc-500 text-lg font-medium">Análise de inventário em tempo real com precisão de mercado.</p>
           </div>
-          <div className="flex bg-white/[0.02] border border-white/[0.05] p-1.5 rounded-2xl">
+          <div className="flex bg-white/2 border border-white/5 p-1.5 rounded-2xl">
             <button onClick={() => { setAbaAtiva('tradelink'); setErro(null); }} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${abaAtiva === 'tradelink' ? 'bg-white text-black shadow-xl' : 'text-zinc-500 hover:text-white'}`}>Trade Link</button>
             <button onClick={() => { setAbaAtiva('avulso'); setErro(null); }} className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${abaAtiva === 'avulso' ? 'bg-white text-black shadow-xl' : 'text-zinc-500 hover:text-white'}`}>Item Avulso</button>
           </div>
         </div>
       </header>
 
-      <div className="px-8 py-16 max-w-[1440px] mx-auto space-y-12">
+      <div className="px-8 py-16 max-w-360 mx-auto space-y-12">
         {abaAtiva === 'tradelink' && (
           <div className="space-y-12 animate-in fade-in duration-500">
-            <div className="bg-white/[0.02] border border-white/[0.05] p-10 rounded-[2.5rem] max-w-3xl mx-auto">
+            <div className="bg-white/2 border border-white/5 p-10 rounded-4xl max-w-3xl mx-auto">
               <form onSubmit={handleCotarInventario} className="space-y-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] ml-1">Trade Link</label>
                   <div className="relative group">
                     <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-purple-500" size={20} />
-                    <input type="text" value={tradeLink} onChange={(e) => setTradeLink(e.target.value)} placeholder="https://steamcommunity.com/tradeoffer/..." className="w-full bg-black/40 border border-white/[0.08] pl-14 pr-6 py-5 rounded-2xl text-sm outline-none focus:border-purple-500/30" />
+                    <input type="text" value={tradeLink} onChange={(e) => setTradeLink(e.target.value)} placeholder="https://steamcommunity.com/tradeoffer/..." className="w-full bg-black/40 border border-white/8 pl-14 pr-6 py-5 rounded-2xl text-sm outline-none focus:border-purple-500/30" />
                   </div>
                 </div>
                 <button disabled={loading || !tradeLink} className="w-full bg-white text-black font-bold py-5 rounded-2xl shadow-xl hover:bg-zinc-200 transition-all text-xs uppercase tracking-widest flex justify-center gap-4">
@@ -363,21 +374,21 @@ export default function CotadorPage() {
             {resultadoInventario && (
               <div className="space-y-8 animate-in fade-in duration-700">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white/[0.02] border border-white/[0.05] p-8 rounded-[2rem]">
+                  <div className="bg-white/2 border border-white/5 p-8 rounded-4xl">
                     <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Total BUFF</div>
                     <div className="text-3xl font-bold">R$ {totalBuff.toFixed(2)}</div>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/[0.05] p-8 rounded-[2rem]">
+                  <div className="bg-white/2 border border-white/5 p-8 rounded-4xl">
                     <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Total YOUPIN</div>
                     <div className="text-3xl font-bold">R$ {totalYoupin.toFixed(2)}</div>
                   </div>
-                  <div className="bg-purple-500/5 border border-purple-500/20 p-8 rounded-[2rem]">
+                  <div className="bg-purple-500/5 border border-purple-500/20 p-8 rounded-4xl">
                     <div className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Média de Mercado</div>
                     <div className="text-3xl font-bold text-purple-400">R$ {totalMedio.toFixed(2)}</div>
                   </div>
                 </div>
 
-                <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-[2rem] flex flex-col xl:flex-row items-center justify-between gap-6">
+                <div className="bg-white/2 border border-white/5 p-6 rounded-4xl flex flex-col xl:flex-row items-center justify-between gap-6">
                   <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto">
                     <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-4 py-3 rounded-xl">
                       <Filter size={16} className="text-zinc-500" />
@@ -390,13 +401,15 @@ export default function CotadorPage() {
                         <option value="adesivo" className="bg-black">Adesivos</option>
                       </select>
                     </div>
-                    <button onClick={() => { setModoSelecao(!modoSelecao); setItensSelecionados(new Set()); }} className={`flex items-center gap-3 px-6 py-3 rounded-xl text-xs font-bold uppercase transition-all ${modoSelecao ? 'bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'bg-white/[0.05] text-zinc-400'}`}>
+                    <button onClick={() => { setModoSelecao(!modoSelecao); setItensSelecionados(new Set()); }} className={`flex items-center gap-3 px-6 py-3 rounded-xl text-xs font-bold uppercase transition-all ${modoSelecao ? 'bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'bg-white/5 text-zinc-400'}`}>
                       {modoSelecao ? <CheckSquare size={16} /> : <Square size={16} />} {modoSelecao ? 'Desativar Seleção' : 'Selecionar Itens'}
                     </button>
+                    
                     {modoSelecao && itensSelecionados.size > 0 && (
                       <div className="flex flex-col md:flex-row items-center gap-3 bg-black/50 px-4 py-2.5 rounded-xl border border-white/10">
                         <span className="text-[10px] text-zinc-500 uppercase font-bold">Desconto (%)</span>
                         <input type="number" className="bg-transparent w-16 outline-none text-green-400 font-bold text-center" value={descontoOferta} onChange={(e) => setDescontoOferta(e.target.value)} />
+                        <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest hidden md:block border-l border-white/10 pl-3">Aplicado sobre o Total YouPin</span>
                       </div>
                     )}
                   </div>
@@ -408,11 +421,9 @@ export default function CotadorPage() {
                         <div className="text-xl font-bold text-green-400">R$ {valorOferta.toFixed(2)}</div>
                       </div>
                       
-                      {/* 🔥 AJUSTE 3: CAIXA DE LUCRO CLARA E EXPLÍCITA */}
                       <div className="bg-purple-500/10 border border-purple-500/30 px-4 py-2 rounded-xl text-right">
                         <div className="text-[10px] text-purple-300 uppercase font-bold">Seu Lucro Líquido</div>
                         <div className="text-lg font-bold text-purple-400 mb-1">R$ {lucroRealizado.toFixed(2)}</div>
-                        <div className="text-[8px] text-zinc-500 uppercase tracking-widest border-t border-purple-500/20 pt-1">Aplicado sobre o total YOUPIN</div>
                       </div>
 
                       <button onClick={() => setModalImagemAberto(true)} className="bg-green-500 hover:bg-green-400 text-black px-6 py-3 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2">
@@ -425,9 +436,10 @@ export default function CotadorPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {itensFiltrados.map((item, idx) => {
                     const isSelected = itensSelecionados.has(item.id);
+                    const proxyImageUrl = item.image ? `/api/cotar/imagens?url=${encodeURIComponent(item.image)}` : '';
 
                     return (
-                      <div key={idx} onClick={() => { if (!modoSelecao) return; setItensSelecionados(prev => { const next = new Set(prev); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; }); }} className={`bg-white/[0.02] border rounded-[2rem] overflow-hidden transition-all flex flex-col ${modoSelecao ? 'cursor-pointer hover:border-purple-500/50' : 'group'} ${isSelected ? 'border-purple-500 ring-1 ring-purple-500 bg-purple-500/5' : 'border-white/[0.05]'}`}>
+                      <div key={idx} onClick={() => { if (!modoSelecao) return; setItensSelecionados(prev => { const next = new Set(prev); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; }); }} className={`bg-white/2 border rounded-4xl overflow-hidden transition-all flex flex-col ${modoSelecao ? 'cursor-pointer hover:border-purple-500/50' : 'group'} ${isSelected ? 'border-purple-500 ring-1 ring-purple-500 bg-purple-500/5' : 'border-white/5'}`}>
                         <div className="aspect-square p-14 relative flex justify-center items-center">
                           {modoSelecao && <div className="absolute top-4 left-4 z-10 bg-black/50 rounded-lg p-1">{isSelected ? <CheckSquare size={20} className="text-purple-500" /> : <Square size={20} className="text-zinc-600" />}</div>}
                           
@@ -437,23 +449,18 @@ export default function CotadorPage() {
                             {item.isSouvenir && <span className="bg-yellow-500/20 backdrop-blur-sm text-yellow-400 px-2 py-1 rounded text-[9px] font-bold uppercase border border-yellow-500/30">Souvenir</span>}
                           </div>
 
-                          <img src={`${item.image}?v=${new Date().getTime()}`} crossOrigin="anonymous" className="w-full h-full object-contain drop-shadow-2xl z-0" alt={item.cleanName} />
-                          {item.amount > 1 && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold">x{item.amount}</div>}
+                          {proxyImageUrl ? (
+                            <img src={`${proxyImageUrl}&v=${new Date().getTime()}`} crossOrigin="anonymous" loading="lazy" className="w-full h-full object-contain drop-shadow-2xl z-0" alt={item.cleanName} />
+                          ) : (
+                            <Box size={48} className="text-zinc-800" />
+                          )}
+                          
+                          {item.amount > 1 && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-white">x{item.amount}</div>}
                         </div>
                         <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                           
                           <h4 className="text-sm font-bold truncate text-white" title={item.cleanName}>{item.cleanName}</h4>
                           
-                          {/* 🔥 AJUSTE 4: DADOS AVANÇADOS (Float, Pattern, Fade) */}
-                          {(item.float || item.pattern || item.phase || item.fade) && (
-                            <div className="flex flex-wrap gap-2 mb-2">
-                              {item.float && <span className="text-[9px] bg-white/5 border border-white/10 text-zinc-400 px-2 py-0.5 rounded uppercase font-bold">Float: {item.float.toFixed(4)}</span>}
-                              {item.pattern && <span className="text-[9px] bg-white/5 border border-white/10 text-zinc-400 px-2 py-0.5 rounded uppercase font-bold">Pattern: {item.pattern}</span>}
-                              {item.phase && <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded uppercase font-bold">{item.phase}</span>}
-                              {item.fade && <span className="text-[9px] bg-pink-500/10 border border-pink-500/20 text-pink-400 px-2 py-0.5 rounded uppercase font-bold">Fade {item.fade}%</span>}
-                            </div>
-                          )}
-
                           <div className="space-y-3 pt-4 border-t border-white/5">
                             <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
                               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">BUFF</span>
@@ -464,6 +471,40 @@ export default function CotadorPage() {
                               <span className={`font-bold text-lg ${parseFloat(item.youpinBRL) > 0 ? 'text-blue-400' : 'text-zinc-700'}`}>{parseFloat(item.youpinBRL) > 0 ? `R$ ${item.youpinBRL}` : 'Sem preço'}</span>
                             </div>
                           </div>
+
+                          {/* 🔥 ÁREA DE DEBUG VISUAL EXTREMO (Apenas na tela principal) */}
+                          <div className="bg-black/80 border border-yellow-500/30 p-3 rounded-xl mt-4">
+                            <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-yellow-500/20 pb-1">
+                              ⚙️ Debug de Atributos
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                              <div className="flex flex-col">
+                                <span className="text-zinc-500">Float:</span>
+                                <span className={item.float !== null ? "text-green-400" : "text-red-400"}>
+                                  {item.float !== null ? item.float.toFixed(6) : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-zinc-500">Pattern:</span>
+                                <span className={item.pattern !== null ? "text-green-400" : "text-red-400"}>
+                                  {item.pattern !== null ? item.pattern : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-zinc-500">Phase:</span>
+                                <span className={item.phase !== null ? "text-green-400" : "text-red-400"}>
+                                  {item.phase !== null ? item.phase : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-zinc-500">Fade %:</span>
+                                <span className={item.fade !== null ? "text-green-400" : "text-red-400"}>
+                                  {item.fade !== null ? `${item.fade}%` : "N/A"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       </div>
                     );
@@ -474,34 +515,36 @@ export default function CotadorPage() {
           </div>
         )}
 
-        {/* ABA ITEM AVULSO (Igual a anterior, omitida para foco, MAS INCLUSA NA SUBSTITUIÇÃO COMPLETA) */}
         {abaAtiva === 'avulso' && (
           <div className="space-y-12 animate-in fade-in duration-500">
-            <div className="bg-white/[0.02] border border-white/[0.05] p-10 rounded-[2.5rem] max-w-3xl mx-auto">
+            <div className="bg-white/2 border border-white/5 p-10 rounded-4xl max-w-3xl mx-auto">
               <form onSubmit={handleCotarAvulsoSubmit} className="space-y-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] ml-1">Buscar Item (Inglês ou Português)</label>
                   <div className="relative">
                     <div className="relative group">
                       <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-purple-500 transition-colors z-10" size={20} />
-                      <input ref={inputRef} type="text" value={skinBusca} onChange={handleInputChange} onKeyDown={handleKeyDown} onFocus={() => skinBusca.length >= 2 && setDropdownAberto(true)} placeholder="Ex: Faca Safira FN, AK Asiimov FT, M4A1s..." className="w-full bg-black/40 border border-white/[0.08] pl-14 pr-12 py-5 rounded-2xl text-sm text-white outline-none focus:border-purple-500/30 transition-all placeholder:text-zinc-800" autoComplete="off" />
+                      <input ref={inputRef} type="text" value={skinBusca} onChange={handleInputChange} onKeyDown={handleKeyDown} onFocus={() => skinBusca.length >= 2 && setDropdownAberto(true)} placeholder="Ex: Faca Safira FN, AK Asiimov FT, M4A1s..." className="w-full bg-black/40 border border-white/8 pl-14 pr-12 py-5 rounded-2xl text-sm text-white outline-none focus:border-purple-500/30 transition-all placeholder:text-zinc-800" autoComplete="off" />
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
                         {loadingSugestoes && <RefreshCw size={16} className="animate-spin text-zinc-600" />}
                         {skinBusca && !loadingSugestoes && <button type="button" onClick={() => { setSkinBusca(''); setDropdownAberto(false); setSugestoes([]); }} className="text-zinc-600 hover:text-white transition-colors"><X size={16} /></button>}
                       </div>
                     </div>
                     {dropdownAberto && (
-                      <div ref={dropdownRef} className="absolute top-full left-0 right-0 mt-2 bg-[#0d0d0e] border border-white/[0.08] rounded-2xl overflow-hidden z-50 shadow-2xl max-h-[400px] overflow-y-auto">
+                      <div ref={dropdownRef} className="absolute top-full left-0 right-0 mt-2 bg-[#0d0d0e] border border-white/8 rounded-2xl overflow-hidden z-50 shadow-2xl max-h-100 overflow-y-auto">
                         {loadingSugestoes && <div className="flex items-center gap-3 px-5 py-4"><RefreshCw size={14} className="animate-spin text-zinc-600" /><span className="text-xs text-zinc-600 font-bold uppercase tracking-widest">Buscando...</span></div>}
                         {!loadingSugestoes && sugestoes.length > 0 && (
-                          sugestoes.map((s, idx) => (
-                            <button key={idx} type="button" onClick={() => { setSkinBusca(''); setDropdownAberto(false); setSugestoes([]); cotarAvulso(s.name, s.image); }} className={`w-full flex items-center gap-4 px-5 py-3 text-left transition-all border-l-2 ${sugestaoSelecionada === idx ? 'bg-purple-500/10 border-purple-500' : 'hover:bg-white/[0.03] border-transparent'}`}>
-                              <div className="w-12 h-12 flex-shrink-0 bg-white/[0.03] rounded-xl overflow-hidden border border-white/5 flex items-center justify-center p-1">
-                                {s.image ? <img src={`${s.image}?v=${new Date().getTime()}`} crossOrigin="anonymous" alt={s.name} className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /> : <Box size={20} className="text-zinc-700" />}
-                              </div>
-                              <span className="text-sm text-zinc-300 truncate font-medium">{s.name}</span>
-                            </button>
-                          ))
+                          sugestoes.map((s, idx) => {
+                            const proxySugImage = s.image ? `/api/cotar/imagens?url=${encodeURIComponent(s.image)}` : '';
+                            return (
+                              <button key={idx} type="button" onClick={() => { setSkinBusca(''); setDropdownAberto(false); setSugestoes([]); cotarAvulso(s.name, s.image); }} className={`w-full flex items-center gap-4 px-5 py-3 text-left transition-all border-l-2 ${sugestaoSelecionada === idx ? 'bg-purple-500/10 border-purple-500' : 'hover:bg-white/3 border-transparent'}`}>
+                                <div className="w-12 h-12 shrink-0 bg-white/3 rounded-xl overflow-hidden border border-white/5 flex items-center justify-center p-1">
+                                  {proxySugImage ? <img src={proxySugImage} crossOrigin="anonymous" alt={s.name} loading="lazy" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /> : <Box size={20} className="text-zinc-700" />}
+                                </div>
+                                <span className="text-sm text-zinc-300 truncate font-medium">{s.name}</span>
+                              </button>
+                            );
+                          })
                         )}
                         {!loadingSugestoes && sugestoes.length === 0 && skinBusca.length >= 2 && (
                           <div className="px-5 py-6 text-center"><p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">Nenhuma skin encontrada</p></div>
@@ -519,7 +562,7 @@ export default function CotadorPage() {
 
             {itensAvulsos.length > 0 && (
               <div className="animate-in fade-in zoom-in-95 duration-500 space-y-12">
-                <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/5 border border-purple-500/20 p-8 md:p-10 rounded-[3rem]">
+                <div className="bg-linear-to-br from-purple-500/10 to-blue-500/5 border border-purple-500/20 p-8 md:p-10 rounded-4xl">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30">
@@ -537,19 +580,19 @@ export default function CotadorPage() {
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                    <div className="bg-black/40 border border-white/5 p-6 rounded-4xl">
                       <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Total Selecionado (+1%)</div>
                       <div className="text-2xl font-bold text-white">¥ {totaisAvulsos.totalCNYComTaxa.toFixed(2)}</div>
                     </div>
-                    <div className="bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                    <div className="bg-black/40 border border-white/5 p-6 rounded-4xl">
                       <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 flex justify-between"><span>Custo Real</span><span className="text-red-400/50">x{totaisAvulsos.taxaCnyBrl.toFixed(4)}</span></div>
                       <div className="text-2xl font-bold text-red-400">R$ {totaisAvulsos.custoTotalRepasse.toFixed(2)}</div>
                     </div>
-                    <div className="bg-black/40 border border-white/5 p-6 rounded-[2rem]">
+                    <div className="bg-black/40 border border-white/5 p-6 rounded-4xl">
                       <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 flex justify-between"><span>Valor Cliente</span><span className="text-blue-400/50">x{taxaRepasse}</span></div>
                       <div className="text-2xl font-bold text-blue-400">R$ {totaisAvulsos.valorClienteRepasse.toFixed(2)}</div>
                     </div>
-                    <div className="bg-purple-500/10 border border-purple-500/30 p-6 rounded-[2rem]">
+                    <div className="bg-purple-500/10 border border-purple-500/30 p-6 rounded-4xl">
                       <div className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-2">Lucro Líquido</div>
                       <div className="text-2xl font-bold text-purple-400">R$ {totaisAvulsos.lucroRepasse.toFixed(2)}</div>
                     </div>
@@ -574,9 +617,10 @@ export default function CotadorPage() {
                     const custoItem = item.youpinCNYComTaxa * totaisAvulsos.taxaCnyBrl;
                     const vendaItem = item.youpinCNYComTaxa * parseFloat(taxaRepasse || "0");
                     const isSelected = itensAvulsosSelecionados.has(item.id);
+                    const proxyAvulsoImage = item.image ? `/api/cotar/imagens?url=${encodeURIComponent(item.image)}` : '';
 
                     return (
-                      <div key={item.id} onClick={() => toggleSelecaoAvulso(item.id)} className={`bg-white/[0.02] border rounded-[2rem] overflow-hidden transition-all cursor-pointer flex flex-col relative ${isSelected ? 'border-purple-500 ring-1 ring-purple-500 bg-purple-500/5' : 'border-white/[0.05] hover:border-purple-500/50 hover:bg-white/[0.04]'}`}>
+                      <div key={item.id} onClick={() => toggleSelecaoAvulso(item.id)} className={`bg-white/2 border rounded-4xl overflow-hidden transition-all cursor-pointer flex flex-col relative ${isSelected ? 'border-purple-500 ring-1 ring-purple-500 bg-purple-500/5' : 'border-white/5 hover:border-purple-500/50 hover:bg-white/4'}`}>
                         <button onClick={(e) => { e.stopPropagation(); setItensAvulsos(prev => prev.filter((_, i) => i !== idx)); setItensAvulsosSelecionados(prev => { const next = new Set(prev); next.delete(item.id); return next; }); }} className="absolute top-4 right-4 z-20 bg-red-500/10 text-red-400 p-2.5 rounded-xl hover:bg-red-500 hover:text-white transition-colors"><X size={16} strokeWidth={3} /></button>
                         
                         <div className="aspect-square p-14 relative flex items-center justify-center">
@@ -590,7 +634,12 @@ export default function CotadorPage() {
                             {item.isSouvenir && <span className="bg-yellow-500/20 backdrop-blur-sm text-yellow-400 px-2 py-1 rounded text-[9px] font-bold uppercase border border-yellow-500/30">Souvenir</span>}
                           </div>
 
-                          <img src={`${item.image}?v=${new Date().getTime()}`} crossOrigin="anonymous" className="w-full h-full object-contain hover:scale-125 transition-transform duration-500 drop-shadow-2xl" alt={item.cleanName} />
+                          {proxyAvulsoImage ? (
+                            <img src={`${proxyAvulsoImage}&v=${new Date().getTime()}`} crossOrigin="anonymous" loading="lazy" className="w-full h-full object-contain hover:scale-125 transition-transform duration-500 drop-shadow-2xl" alt={item.cleanName} />
+                          ) : (
+                            <Box size={48} className="text-zinc-800" />
+                          )}
+                          
                           {item.amount > 1 && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold">x{item.amount}</div>}
                         </div>
                         
@@ -605,7 +654,7 @@ export default function CotadorPage() {
                               <span className="text-[10px] text-zinc-500 font-bold uppercase">YOUPIN (+1%)</span>
                               <span className="font-bold text-lg text-blue-400">¥ {item.youpinCNYComTaxa.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-[10px] font-bold uppercase pt-3 border-t border-white/[0.02]">
+                            <div className="flex justify-between items-center text-[10px] font-bold uppercase pt-3 border-t border-white/2">
                               <span className="text-zinc-600">LUCRO</span>
                               <span className="text-green-400 font-bold bg-green-400/10 px-3 py-1.5 rounded-lg text-sm">R$ {(vendaItem - custoItem).toFixed(2)}</span>
                             </div>
@@ -621,73 +670,76 @@ export default function CotadorPage() {
         )}
       </div>
 
-      {/* ========================================== */}
-      {/* MODAL DE GERAÇÃO DE IMAGEM ESPELHADO       */}
-      {/* ========================================== */}
+      {/* MODAL DE GERAÇÃO DE IMAGEM ESPELHADO */}
       {modalImagemAberto && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl bg-[#080809] border border-white/10 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+          <div className="w-full max-w-5xl bg-[#050505] border border-white/10 rounded-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#080809]">
               <h2 className="text-xl font-bold text-white">Oferta Gerada</h2>
               <button onClick={() => setModalImagemAberto(false)} className="p-2 bg-white/5 rounded-xl hover:bg-white/10 text-white"><X size={20} /></button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8" style={{ backgroundColor: '#050505', color: '#ffffff' }} ref={modalRef}>
+            <div className="flex-1 overflow-y-auto p-8 bg-[#050505]" ref={modalRef}>
               <div className="text-center mb-10">
-                <h1 className="text-4xl font-bold tracking-tight" style={{ color: '#ffffff' }}>Proposta de Compra</h1>
-                <p className="text-sm mt-2" style={{ color: '#71717a' }}>Inventário analisado profissionalmente em tempo real.</p>
+                <h1 className="text-4xl font-bold tracking-tight text-white">Proposta de Compra</h1>
+                <p className="text-sm mt-2 text-zinc-500">Inventário analisado profissionalmente em tempo real.</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-                {itensParaModal.map((item, idx) => (
-                  <div key={idx} style={{ backgroundColor: '#080809', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ padding: '32px', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end', zIndex: 10 }}>
-                        {item.wear && <span style={{ backgroundColor: 'rgba(0,0,0,0.8)', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', color: '#d4d4d8', textTransform: 'uppercase' }}>{item.wear}</span>}
-                        {item.isStatTrak && <span style={{ backgroundColor: 'rgba(249,115,22,0.2)', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', color: '#fb923c', border: '1px solid rgba(249,115,22,0.3)' }}>StatTrak™</span>}
-                        {item.isSouvenir && <span style={{ backgroundColor: 'rgba(234,179,8,0.2)', padding: '4px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 'bold', color: '#facc15', border: '1px solid rgba(234,179,8,0.3)' }}>Souvenir</span>}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                {itensParaModal.map((item, idx) => {
+                  const isGem = item.phase && ['Ruby', 'Sapphire', 'Emerald', 'Black Pearl'].includes(item.phase);
+                  const proxyModalImage = item.image ? `/api/cotar/imagens?url=${encodeURIComponent(item.image)}` : '';
+                  
+                  return (
+                    <div key={idx} className="bg-white/2 border border-white/5 rounded-4xl overflow-hidden flex flex-col">
+                      <div className="aspect-square p-14 relative flex justify-center items-center">
+                        <div className="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
+                          {item.wear && <span className="bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-[9px] font-bold text-zinc-300 uppercase shadow-xl border border-white/5">{item.wear}</span>}
+                          {item.isStatTrak && <span className="bg-orange-500/20 backdrop-blur-sm text-orange-400 px-2 py-1 rounded text-[9px] font-bold uppercase border border-orange-500/30">StatTrak™</span>}
+                          {item.isSouvenir && <span className="bg-yellow-500/20 backdrop-blur-sm text-yellow-400 px-2 py-1 rounded text-[9px] font-bold uppercase border border-yellow-500/30">Souvenir</span>}
+                        </div>
+                        
+                        {proxyModalImage && <img src={`${proxyModalImage}&v=${new Date().getTime()}`} crossOrigin="anonymous" alt={item.cleanName} className="w-full h-full object-contain drop-shadow-2xl z-0" />}
+                        
+                        {item.amount > 1 && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-white">x{item.amount}</div>}
                       </div>
                       
-                      {/* 🔥 A MÁGICA FINAL DA IMAGEM NO PNG */}
-                      <img src={`${item.image}?v=${new Date().getTime()}`} crossOrigin="anonymous" alt={item.cleanName} style={{ width: '100%', height: 'auto', objectFit: 'contain', zIndex: 0 }} />
-                      
-                      {item.amount > 1 && <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.8)', padding: '4px 12px', borderRadius: '999px', fontSize: '10px', fontWeight: 'bold', color: '#ffffff' }}>x{item.amount}</div>}
-                    </div>
-                    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                      <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffffff', margin: 0 }}>{item.cleanName}</h4>
-                      
-                      {(item.float || item.pattern || item.phase || item.fade) && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {item.float && <span style={{ fontSize: '9px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#a1a1aa', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Float: {item.float.toFixed(4)}</span>}
-                          {item.pattern && <span style={{ fontSize: '9px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#a1a1aa', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Pattern: {item.pattern}</span>}
-                          {item.phase && <span style={{ fontSize: '9px', backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>{item.phase}</span>}
-                          {item.fade && <span style={{ fontSize: '9px', backgroundColor: 'rgba(236,72,153,0.1)', border: '1px solid rgba(236,72,153,0.2)', color: '#f472b6', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Fade {item.fade}%</span>}
-                        </div>
-                      )}
-                      
-                      <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                          <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 'bold' }}>BUFF</span>
-                          <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#c084fc' }}>R$ {item.buffBRL}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                          <span style={{ fontSize: '10px', color: '#71717a', fontWeight: 'bold' }}>YOUPIN</span>
-                          <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#60a5fa' }}>R$ {item.youpinBRL}</span>
+                      <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                        <h4 className="text-sm font-bold truncate text-white" title={item.cleanName}>{item.cleanName}</h4>
+                        
+                        {(item.float != null || item.pattern != null || item.phase != null || item.fade != null) && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {item.float != null && <span className="text-[9px] bg-white/5 border border-white/10 text-zinc-400 px-2 py-0.5 rounded uppercase font-bold">Float: {item.float.toFixed(4)}</span>}
+                            {item.pattern != null && <span className="text-[9px] bg-white/5 border border-white/10 text-zinc-400 px-2 py-0.5 rounded uppercase font-bold">Pattern: {item.pattern}</span>}
+                            {item.phase != null && <span className={`text-[9px] px-2 py-0.5 rounded uppercase font-bold border ${isGem ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{item.phase}</span>}
+                            {item.fade != null && <span className="text-[9px] bg-pink-500/10 border border-pink-500/20 text-pink-400 px-2 py-0.5 rounded uppercase font-bold">Fade {item.fade}%</span>}
+                          </div>
+                        )}
+                        
+                        <div className="space-y-3 pt-4 border-t border-white/5">
+                          <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
+                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">BUFF</span>
+                            <span className="font-bold text-lg text-purple-400">R$ {item.buffBRL}</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
+                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">YOUPIN</span>
+                            <span className="font-bold text-lg text-blue-400">R$ {item.youpinBRL}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              <div style={{ backgroundColor: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '24px', padding: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="bg-purple-500/5 border border-purple-500/20 rounded-4xl p-8 flex justify-between items-center">
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>Valor Real (YouPin)</div>
-                  <div style={{ fontSize: '20px', fontWeight: '500', color: '#71717a', textDecoration: 'line-through' }}>R$ {totalYoupin.toFixed(2)}</div>
+                  <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">Valor Real (YouPin)</div>
+                  <div className="text-2xl font-medium text-zinc-500 line-through">R$ {totalYoupin.toFixed(2)}</div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#4ade80', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>Oferta Final</div>
-                  <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#4ade80' }}>R$ {valorOferta.toFixed(2)}</div>
+                <div className="text-right">
+                  <div className="text-xs font-bold text-green-400 uppercase tracking-widest mb-1">Oferta Final</div>
+                  <div className="text-5xl font-bold text-green-400">R$ {valorOferta.toFixed(2)}</div>
                 </div>
               </div>
             </div>
