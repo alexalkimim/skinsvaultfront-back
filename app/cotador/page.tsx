@@ -5,11 +5,12 @@ import html2canvas from 'html2canvas';
 import {
   Search, Link as LinkIcon, RefreshCw,
   AlertCircle, Box, X, 
-  Filter, CheckSquare, Square, Calculator, Copy, Camera, Download
+  Filter, CheckSquare, Square, Calculator, Copy, Camera, Download, Loader2
 } from 'lucide-react';
 
 interface SkinCotada {
   id: string;
+  assetid: string;
   name: string;
   cleanName: string;
   image: string | null;
@@ -23,6 +24,8 @@ interface SkinCotada {
   pattern: number | null;
   phase: string | null;
   fade: number | null;
+  isEnriching: boolean;      
+  tradeLockedFloat: boolean; 
 }
 
 interface ItemAvulso {
@@ -56,7 +59,11 @@ export default function CotadorPage() {
   const [erro, setErro] = useState<string | null>(null);
 
   const [tradeLink, setTradeLink] = useState('');
+  const [steamId64Global, setSteamId64Global] = useState(''); 
   const [resultadoInventario, setResultadoInventario] = useState<{ items: SkinCotada[], totalBuff: string, totalYoupin: string } | null>(null);
+  
+  const [triggerEnrich, setTriggerEnrich] = useState(false);
+
   const [modoSelecao, setModoSelecao] = useState(false);
   const [itensSelecionados, setItensSelecionados] = useState<Set<string>>(new Set());
   const [filtroTipo, setFiltroTipo] = useState('todos');
@@ -88,21 +95,59 @@ export default function CotadorPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 🔥 Log de Debug Frontend exato conforme solicitado
+  // FASE 3: ENRICH SILENCIOSO EM BACKGROUND (MERGE INCREMENTAL)
   useEffect(() => {
-    if (resultadoInventario) {
-      const comAtributos = resultadoInventario.items.filter(i => i.float !== null || i.pattern !== null || i.phase !== null);
-      if (comAtributos.length > 0) {
-        console.log(`\n==================================================`);
-        console.log(`[FRONTEND]`);
-        console.log(`Dados recebidos para ${comAtributos.length} itens.`);
-        console.log(`Exemplo - ${comAtributos[0].cleanName}:`);
-        console.log(`float: ${comAtributos[0].float}`);
-        console.log(`==================================================\n`);
-      }
-    }
-  }, [resultadoInventario]);
+    if (!triggerEnrich || !resultadoInventario || !steamId64Global) return;
+    setTriggerEnrich(false); 
 
+    const fetchEnrich = async () => {
+        const assetIdsParaEnrich = resultadoInventario.items
+            .filter(i => i.isEnriching)
+            .map(i => i.assetid);
+
+        if (assetIdsParaEnrich.length === 0) return;
+
+        try {
+            const res = await fetch('/api/cotar/enrich', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steamId64: steamId64Global, assetIds: assetIdsParaEnrich }),
+            });
+            const data = await res.json();
+            const enrichedItems: { assetid: string, float: number | null, pattern: number | null, tradeLockedFloat: boolean }[] = data.items || [];
+
+            // MERGE NÃO-DESTRUTIVO: Mantém TODOS os itens da V2 intocados, só injeta o float.
+            setResultadoInventario(prev => {
+                if (!prev) return null;
+                const newItems = prev.items.map(item => {
+                    const enrichData = enrichedItems.find(e => e.assetid === item.assetid);
+                    if (enrichData) {
+                        return {
+                            ...item, // Preserva TUDO da V2 (preços, nomes, imagens)
+                            float: enrichData.float,
+                            pattern: enrichData.pattern,
+                            tradeLockedFloat: enrichData.tradeLockedFloat,
+                            isEnriching: false // Desliga o loader
+                        };
+                    }
+                    // Se não encontrou no V1, o item permanece existindo na tela, apenas desligamos o loader.
+                    return { ...item, isEnriching: false }; 
+                });
+                return { ...prev, items: newItems };
+            });
+        } catch (err) {
+            // Em caso de erro na V1, mantém TODOS OS ITENS e apenas desliga o loader
+            setResultadoInventario(prev => {
+                if (!prev) return null;
+                return { ...prev, items: prev.items.map(i => ({ ...i, isEnriching: false })) };
+            });
+        }
+    };
+
+    fetchEnrich();
+  }, [triggerEnrich, resultadoInventario, steamId64Global]);
+
+  // FASE 1: V2 ENGINE PRIMEIRO
   const handleCotarInventario = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tradeLink) return;
@@ -121,7 +166,13 @@ export default function CotadorPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro na cotação');
+      
+      setSteamId64Global(data.steamId64);
       setResultadoInventario(data);
+      
+      // Tela renderizada! Aciona o enrich em background.
+      setTriggerEnrich(true);
+
     } catch (error: unknown) {
       setErro(error instanceof Error ? error.message : 'Erro na cotação');
     } finally {
@@ -472,37 +523,48 @@ export default function CotadorPage() {
                             </div>
                           </div>
 
-                          {/* 🔥 ÁREA DE DEBUG VISUAL EXTREMO (Apenas na tela principal) */}
                           <div className="bg-black/80 border border-yellow-500/30 p-3 rounded-xl mt-4">
-                            <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-yellow-500/20 pb-1">
-                              ⚙️ Debug de Atributos
+                            <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-yellow-500/20 pb-1 flex justify-between items-center">
+                              <span>⚙️ Atributos Avançados</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                              <div className="flex flex-col">
-                                <span className="text-zinc-500">Float:</span>
-                                <span className={item.float !== null ? "text-green-400" : "text-red-400"}>
-                                  {item.float !== null ? item.float.toFixed(6) : "N/A"}
-                                </span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-zinc-500">Pattern:</span>
-                                <span className={item.pattern !== null ? "text-green-400" : "text-red-400"}>
-                                  {item.pattern !== null ? item.pattern : "N/A"}
-                                </span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-zinc-500">Phase:</span>
-                                <span className={item.phase !== null ? "text-green-400" : "text-red-400"}>
-                                  {item.phase !== null ? item.phase : "N/A"}
-                                </span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-zinc-500">Fade %:</span>
-                                <span className={item.fade !== null ? "text-green-400" : "text-red-400"}>
-                                  {item.fade !== null ? `${item.fade}%` : "N/A"}
-                                </span>
-                              </div>
-                            </div>
+                            
+                            {item.isEnriching ? (
+                                <div className="flex items-center gap-2 text-xs text-zinc-500 py-1 animate-pulse">
+                                    <Loader2 size={14} className="animate-spin" />
+                                    Buscando atributos avançados...
+                                </div>
+                            ) : item.tradeLockedFloat ? (
+                                <div className="text-[10px] text-zinc-500 italic py-1 leading-tight">
+                                    Item recém saído da trade lock — atributos indisponíveis temporariamente
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                                    <div className="flex flex-col">
+                                        <span className="text-zinc-500">Float:</span>
+                                        <span className={item.float !== null ? "text-green-400" : "text-zinc-700"}>
+                                        {item.float !== null ? item.float.toFixed(6) : "N/A"}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-zinc-500">Pattern:</span>
+                                        <span className={item.pattern !== null ? "text-green-400" : "text-zinc-700"}>
+                                        {item.pattern !== null ? item.pattern : "N/A"}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-zinc-500">Phase:</span>
+                                        <span className={item.phase !== null ? "text-green-400" : "text-zinc-700"}>
+                                        {item.phase !== null ? item.phase : "N/A"}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-zinc-500">Fade %:</span>
+                                        <span className={item.fade !== null ? "text-green-400" : "text-zinc-700"}>
+                                        {item.fade !== null ? `${item.fade}%` : "N/A"}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                           </div>
 
                         </div>
@@ -670,7 +732,6 @@ export default function CotadorPage() {
         )}
       </div>
 
-      {/* MODAL DE GERAÇÃO DE IMAGEM ESPELHADO */}
       {modalImagemAberto && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-5xl bg-[#050505] border border-white/10 rounded-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
